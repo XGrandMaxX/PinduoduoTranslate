@@ -1,0 +1,63 @@
+# GitLab.com hosted macOS runners require Premium/Ultimate or an eligible
+# open-source program. A self-managed Mac runner can use a different tag.
+stages:
+  - validate
+  - build
+
+variables:
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+
+validate-project:
+  stage: validate
+  image: python:3.13-slim
+  tags:
+    - saas-linux-small-amd64
+  timeout: 5 minutes
+  script:
+    - python3 scripts/check_project.py
+    - python3 scripts/check_secrets.py
+
+iphone-unsigned-build:
+  stage: build
+  tags:
+    - saas-macos-medium-m1
+  image: macos-27-xcode-27
+  timeout: 20 minutes
+  interruptible: true
+  # Opt in only after a compatible Mac runner has been made available.
+  rules:
+    - if: '$RUN_IOS_BUILD == "1"'
+      when: manual
+    - when: never
+  script:
+    - xcodebuild -version
+    - brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+    - python3 scripts/check_project.py
+    - xcodegen generate
+    - mkdir -p build
+    - |
+      if ! xcodebuild \
+        -project PinduoTranslate.xcodeproj \
+        -scheme PinduoTranslate \
+        -configuration Debug \
+        -sdk iphoneos \
+        -destination 'generic/platform=iOS' \
+        -derivedDataPath build/DerivedData \
+        CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+        build > build/xcodebuild.log 2>&1; then
+        tail -n 70 build/xcodebuild.log
+        exit 1
+      fi
+      tail -n 8 build/xcodebuild.log
+    - |
+      ditto -c -k --keepParent \
+        build/DerivedData/Build/Products/Debug-iphoneos/PinduoTranslate.app \
+        build/PinduoTranslate-UNSIGNED.app.zip
+  artifacts:
+    access: maintainer
+    name: 'iphone-unsigned-$CI_COMMIT_SHORT_SHA'
+    when: always
+    expire_in: 7 days
+    paths:
+      - build/xcodebuild.log
+      - build/PinduoTranslate-UNSIGNED.app.zip
