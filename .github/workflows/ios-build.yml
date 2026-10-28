@@ -17,9 +17,14 @@ concurrency:
 jobs:
   unsigned-build:
     runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: [PinduoTranslate, PinduoTranslate27]
     timeout-minutes: 20
     env:
       HOMEBREW_NO_AUTO_UPDATE: '1'
+      APP_SCHEME: ${{ matrix.scheme }}
     steps:
       - uses: actions/checkout@v4
       - name: Install project generator
@@ -37,7 +42,7 @@ jobs:
           xcodebuild -version
           if ! xcodebuild \
             -project PinduoTranslate.xcodeproj \
-            -scheme PinduoTranslate \
+            -scheme "$APP_SCHEME" \
             -configuration Debug \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
@@ -57,20 +62,24 @@ jobs:
           tail -n 8 build/xcodebuild.log
       - name: Package unsigned app for inspection
         run: |
-          ditto -c -k --keepParent \
-            build/DerivedData/Build/Products/Debug-iphoneos/PinduoTranslate.app \
-            build/PinduoTranslate-UNSIGNED.app.zip
+          app_path="build/DerivedData/Build/Products/Debug-iphoneos/$APP_SCHEME.app"
+          ditto -c -k --keepParent "$app_path" "build/$APP_SCHEME-UNSIGNED.app.zip"
+          mkdir -p build/Payload
+          cp -R "$app_path" build/Payload/
+          ditto -c -k --keepParent build/Payload "build/$APP_SCHEME-UNSIGNED.ipa"
       - name: Save build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xcode-build-log
+          name: xcode-build-log-${{ matrix.scheme }}
           path: build/xcodebuild.log
           retention-days: 7
           if-no-files-found: ignore
       - name: Save unsigned app
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-app-not-installable
-          path: build/PinduoTranslate-UNSIGNED.app.zip
+          name: unsigned-app-${{ matrix.scheme }}
+          path: |
+            build/${{ matrix.scheme }}-UNSIGNED.app.zip
+            build/${{ matrix.scheme }}-UNSIGNED.ipa
           retention-days: 7

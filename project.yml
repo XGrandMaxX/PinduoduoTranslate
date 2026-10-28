@@ -16,6 +16,23 @@ configFiles:
   Debug: Config/Build.xcconfig
   Release: Config/Build.xcconfig
 targets:
+  PinduoTranslate27:
+    type: application
+    platform: iOS
+    deploymentTarget: '27.0'
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).standalone27
+        INFOPLIST_FILE: Config/App27-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        IPHONEOS_DEPLOYMENT_TARGET: '27.0'
+    dependencies:
+      - sdk: AVKit.framework
+      - sdk: Translation.framework
+      - sdk: ReplayKit.framework
+      - sdk: ScreenCaptureKit.framework
+      - sdk: Vision.framework
   PinduoTranslate:
     type: application
     platform: iOS
@@ -50,6 +67,14 @@ targets:
       - sdk: ReplayKit.framework
       - sdk: Vision.framework
 schemes:
+  PinduoTranslate27:
+    build:
+      targets:
+        PinduoTranslate27: all
+    run:
+      config: Debug
+    archive:
+      config: Release
   PinduoTranslate:
     build:
       targets:

@@ -56,6 +56,14 @@ enum SharedStoreError: LocalizedError {
 // Only one current OCR result is stored, never screen images or a history.
 struct SharedStore {
     private func file(_ name: String) throws -> URL {
+        if Bundle.main.object(forInfoDictionaryKey: "StorageMode") as? String == "private" {
+            let manager = FileManager.default
+            let root = try manager.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                       appropriateFor: nil, create: true)
+                .appendingPathComponent("LiveTranslation", isDirectory: true)
+            try manager.createDirectory(at: root, withIntermediateDirectories: true)
+            return root.appendingPathComponent(name)
+        }
         guard let group = Bundle.main.object(forInfoDictionaryKey: "AppGroupIdentifier") as? String,
               let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)
         else { throw SharedStoreError.missingGroup }

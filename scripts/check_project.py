@@ -24,6 +24,10 @@ def check():
     assert 'screen-capture' in app['UIBackgroundModes']
     assert app['NSScreenCaptureUsageDescription']
     assert 'NSMicrophoneUsageDescription' not in app
+    standalone = plists['App27-Info.plist']
+    assert standalone['StorageMode'] == 'private'
+    assert 'AppGroupIdentifier' not in standalone
+    assert 'BroadcastExtensionIdentifier' not in standalone
     for folder in ('App', 'BroadcastExtension', 'Shared'):
         assert list((ROOT / folder).glob('*.swift')), f'No Swift sources in {folder}'
     for path in ROOT.rglob('*.mobileprovision'):
