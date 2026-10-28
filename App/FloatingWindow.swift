@@ -7,6 +7,15 @@ final class VideoSurface: UIView {
     var videoLayer: AVSampleBufferDisplayLayer { layer as! AVSampleBufferDisplayLayer }
 }
 
+private final class PlaybackState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var paused = false
+    var isPaused: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return paused }
+        set { lock.lock(); paused = newValue; lock.unlock() }
+    }
+}
+
 @MainActor
 final class FloatingWindow: NSObject, ObservableObject {
     @Published private(set) var isActive = false
@@ -18,6 +27,7 @@ final class FloatingWindow: NSObject, ObservableObject {
     private var timer: Timer?
     private weak var engine: TranslationEngine?
     private var frameNumber: Int64 = 0
+    private nonisolated let playbackState = PlaybackState()
 
     func configure(engine: TranslationEngine) {
         guard controller == nil else { return }
@@ -74,6 +84,7 @@ final class FloatingWindow: NSObject, ObservableObject {
 
     private func render() {
         guard let engine else { return }
+        playbackState.isPaused = engine.isPaused
         // Fixed, modest resolution bounds memory and remains readable in PiP.
         let width = 600, height = 840
         let format = UIGraphicsImageRendererFormat()
@@ -151,36 +162,38 @@ final class FloatingWindow: NSObject, ObservableObject {
 }
 
 extension FloatingWindow: AVPictureInPictureControllerDelegate {
-    func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        isActive = true
+    nonisolated func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor [weak self] in self?.isActive = true }
     }
-    func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        isActive = false
+    nonisolated func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor [weak self] in self?.isActive = false }
     }
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
                                    failedToStartPictureInPictureWithError error: Error) {
-        self.error = error.localizedDescription
+        let message = error.localizedDescription
+        Task { @MainActor [weak self] in self?.error = message }
     }
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
         completionHandler(true)
     }
 }
 
 extension FloatingWindow: AVPictureInPictureSampleBufferPlaybackDelegate {
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
-        engine?.isPaused = !playing
+    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
+        playbackState.isPaused = !playing
+        Task { @MainActor [weak self] in self?.engine?.isPaused = !playing }
     }
-    func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
+    nonisolated func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
         CMTimeRange(start: .zero, duration: .positiveInfinity)
     }
-    func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
-        engine?.isPaused ?? false
+    nonisolated func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
+        playbackState.isPaused
     }
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
                                    didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
-                                   skipByInterval skipInterval: CMTime, completion completionHandler: @escaping () -> Void) {
+    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                   skipByInterval skipInterval: CMTime, completion completionHandler: @escaping @Sendable () -> Void) {
         completionHandler()
     }
 }

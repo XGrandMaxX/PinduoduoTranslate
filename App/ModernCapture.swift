@@ -88,10 +88,7 @@ private final class ModernCapture: NSObject, SCContentSharingPickerObserver, SCS
             let config = SCStreamConfiguration()
             config.width = 828
             config.height = 1792
-            config.minimumFrameInterval = CMTime(value: 3, timescale: 2)
-            config.queueDepth = 3
             config.capturesAudio = false
-            config.captureMicrophone = false
             let stream = SCStream(filter: filter, configuration: config, delegate: self)
             try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
             capture = stream

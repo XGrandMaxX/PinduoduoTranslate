@@ -44,6 +44,13 @@ jobs:
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             build > build/xcodebuild.log 2>&1; then
+            python3 - <<'PY'
+          import re
+          from pathlib import Path
+          lines = Path('build/xcodebuild.log').read_text(errors='replace').splitlines()
+          for line in [s for s in lines if re.search(r'error:|fatal error:|BUILD FAILED', s)][-30:]:
+              print(line[:1200])
+          PY
             tail -n 70 build/xcodebuild.log
             exit 1
           fi
