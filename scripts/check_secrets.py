@@ -21,7 +21,7 @@ PATTERNS = {
     'payment field': re.compile(r'''(?i)\b(?:cvv|cvc|card_number|cardnumber)\s*[:=]\s*["']?\d[\d -]{2,}'''),
 }
 PAN = re.compile(r'(?<![A-Za-z0-9_])(?:[0-9][ -]?){12,18}[0-9](?![A-Za-z0-9_])')
-EXCLUDED = {'.git', '.audit', '.validation-deps', '.venv', '__pycache__', 'build', 'DerivedData'}
+EXCLUDED = {'.git', '.audit', '.validation-deps', '.venv', '__pycache__', 'build', 'DerivedData', 'dist'}
 FORBIDDEN_SUFFIXES = {'.p12', '.p8', '.mobileprovision', '.key', '.pem'}
 
 

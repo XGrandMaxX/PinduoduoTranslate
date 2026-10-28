@@ -4,8 +4,10 @@
 через Apple Vision → перевод на русский через Apple Translation → окно
 «Картинка в картинке» с русским и исходным текстом.
 
-**Статус: основной вариант успешно собран Xcode 27.1 на облачном Mac.
-Проверка на физическом iPhone ещё не выполнена; приложение не установлено.**
+**Статус: обе схемы успешно собраны Xcode 27.1 на облачных Mac.
+[Подтверждённая сборка](https://github.com/XGrandMaxX/PinduoduoTranslate/actions/runs/40718889228).
+Получены IPA для физических iPhone (arm64). Подпись Apple, установка
+и проверка работы на телефоне ещё не выполнены.**
 
 [Репозиторий GitLab](https://gitlab.com/XGrandMaxX/pinduoduoTranslate) ·
 [Проверки GitLab](https://gitlab.com/XGrandMaxX/pinduoduoTranslate/-/pipelines) ·
