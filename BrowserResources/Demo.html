@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hans"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Демо · Пиндуо Перевод</title>
+<style>
+body{margin:0;background:#f4f5f7;color:#25282d;font:16px -apple-system,sans-serif}
+header{padding:24px;background:#fff}h1{font-size:25px;margin:0 0 8px}p{line-height:1.5}
+main{padding:16px}.card{background:white;border-radius:18px;padding:18px;margin-bottom:16px}
+.price{color:#c72538;font-size:26px;font-weight:700}.image{width:100%;border-radius:12px}
+button,a{font:inherit}button{border:0;border-radius:12px;background:#087e76;color:white;padding:14px 20px}
+input{font:inherit;box-sizing:border-box;width:100%;padding:12px;border:1px solid #ccd2d8;border-radius:10px}
+.note{color:#65717d;font-size:13px}#result{padding-top:12px;min-height:24px}
+</style></head><body>
+<header><h1>中文商品示例</h1><div>本地演示，不会下单</div>
+<p class="note" translate="no">Это локальная проверка перевода, прокрутки и кнопок. Покупки и отправка данных отсутствуют.</p></header>
+<main>
+<section class="card"><h2>纯棉短袖上衣</h2><p>柔软面料，适合日常穿着</p>
+<div class="price">¥ 39.90</div><p>颜色：红色　尺码：大号</p>
+<button id="cart" onclick="this.textContent='已加入购物车';document.getElementById('result').textContent='操作成功'">加入购物车</button>
+<div id="result" role="status"></div></section>
+<section class="card"><h2>图片上的文字</h2><img class="image" src="DemoImage.svg" alt="">
+<p class="note" translate="no">Векторная картинка выше проверяет распознавание текста на изображениях.</p></section>
+<section class="card"><h2>商品规格</h2><p>材质：棉</p><p>包装数量：一件</p><p>请先确认商品尺寸</p>
+<label for="private">输入内容不会被提取用于翻译</label>
+<input id="private" autocomplete="off" placeholder="Локальное поле для проверки приватности"></section>
+<section class="card"><h2>继续浏览</h2><p>向上滚动查看商品</p>
+<button id="more" onclick="document.getElementById('extra').textContent='新商品：旅行背包'">显示新商品</button>
+<p id="extra"></p><a href="Demo.html?second=1">打开演示页面</a></section>
+</main></body></html>

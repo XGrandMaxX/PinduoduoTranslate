@@ -10,8 +10,8 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     IPHONEOS_DEPLOYMENT_TARGET: '26.0'
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: '0.1.0'
-    CURRENT_PROJECT_VERSION: '1'
+    MARKETING_VERSION: '0.2.0'
+    CURRENT_PROJECT_VERSION: '2'
 configFiles:
   Debug: Config/Build.xcconfig
   Release: Config/Build.xcconfig
@@ -20,7 +20,11 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: '27.0'
-    sources: [App, Shared]
+    sources:
+      - App
+      - Shared
+      - path: BrowserResources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).standalone27
@@ -33,10 +37,15 @@ targets:
       - sdk: ReplayKit.framework
       - sdk: ScreenCaptureKit.framework
       - sdk: Vision.framework
+      - sdk: WebKit.framework
   PinduoTranslate:
     type: application
     platform: iOS
-    sources: [App, Shared]
+    sources:
+      - App
+      - Shared
+      - path: BrowserResources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX)
@@ -51,6 +60,7 @@ targets:
       - sdk: ReplayKit.framework
       - sdk: ScreenCaptureKit.framework
       - sdk: Vision.framework
+      - sdk: WebKit.framework
   ScreenBroadcast:
     type: app-extension
     platform: iOS

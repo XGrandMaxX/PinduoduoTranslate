@@ -4,7 +4,14 @@ import ReplayKit
 
 @main
 struct PinduoTranslateApp: App {
-    var body: some Scene { WindowGroup { ContentView() } }
+    var body: some Scene {
+        WindowGroup {
+            TabView {
+                BrowserView().tabItem { Label("Браузер", systemImage: "globe") }
+                ContentView().tabItem { Label("Захват экрана", systemImage: "rectangle.inset.filled") }
+            }
+        }
+    }
 }
 
 struct ContentView: View {

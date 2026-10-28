@@ -30,6 +30,8 @@ def check():
     assert 'BroadcastExtensionIdentifier' not in standalone
     for folder in ('App', 'BroadcastExtension', 'Shared'):
         assert list((ROOT / folder).glob('*.swift')), f'No Swift sources in {folder}'
+    for resource in ('TranslatePage.js', 'Demo.html', 'DemoImage.svg'):
+        assert (ROOT / 'BrowserResources' / resource).is_file(), f'Missing browser resource: {resource}'
     for path in ROOT.rglob('*.mobileprovision'):
         raise AssertionError(f'Provisioning profile must stay outside project: {path.name}')
     print(f'OK: {len(plists)} plist/entitlement files, shared identifiers, capture configuration and source targets')

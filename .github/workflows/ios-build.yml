@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - 'App/**'
+      - 'BrowserResources/**'
+      - 'tests/**'
+      - 'scripts/**'
       - 'BroadcastExtension/**'
       - 'Shared/**'
       - 'Config/**'
@@ -15,7 +18,17 @@ concurrency:
   group: iphone-build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --prefix build/test-deps --no-audit --no-fund --ignore-scripts jsdom@26.1.0
+      - run: NODE_PATH=build/test-deps/node_modules node --test tests/browser_translation.test.cjs
   unsigned-build:
+    needs: browser-tests
     runs-on: xcode-27
     strategy:
       fail-fast: false
