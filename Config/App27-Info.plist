@@ -44,5 +44,14 @@
 	<false/>
 	<key>StorageMode</key>
 	<string>private</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Подключаться к вашему ПК в домашней сети, показывать Pinduoduo с переводом и передавать касания.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Сканировать QR-код подключения на вашем ПК. Изображение с камеры не сохраняется.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

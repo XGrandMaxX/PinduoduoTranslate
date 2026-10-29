@@ -7,6 +7,7 @@ struct PinduoTranslateApp: App {
     var body: some Scene {
         WindowGroup {
             TabView {
+                RemoteClientView().tabItem { Label("С ПК", systemImage: "iphone.and.arrow.forward") }
                 BrowserView().tabItem { Label("Браузер", systemImage: "globe") }
                 ContentView().tabItem { Label("Захват экрана", systemImage: "rectangle.inset.filled") }
             }
