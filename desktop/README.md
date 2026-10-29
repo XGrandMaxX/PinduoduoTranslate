@@ -1,6 +1,6 @@
 # Local Pinduoduo translation prototype
 
-This is a local PC prototype. A usable independent iPhone client is not ready.
+This is a local PC prototype. LAN playback and touch are verified; the full goods-detail flow remains unresolved.
 
 ## WinClose boundary
 
@@ -10,8 +10,8 @@ was rolled back on 2026-10-29. The original WinClose executable was restarted;
 its configuration and pairing files were not edited.
 
 The translator no longer imports a WinClose sender, discovers its installation,
-reads its credentials, or exposes phone/start endpoints. The former sender module
-is a documentation-only tombstone. Do not restore this integration. See AGENTS.md.
+reads its credentials, or exposes WinClose sender endpoints. The independent
+phone_link.py owns separate LAN pairing. Do not restore the former integration. See AGENTS.md.
 Any future iPhone connection must have independent pairing and transport.
 
 ## Local PC use
@@ -62,10 +62,10 @@ Keep port 18889 on 127.0.0.1. It has Host/Origin checks, not phone authenticatio
 Do not expose it to a LAN or public tunnel. Model inference is also loopback-only,
 with a random local key in ignored .audit/.
 
-## Independent iPhone client (0.3)
+## Independent iPhone client (0.4)
 
-The iPhone app has a separate “С ПК” tab. On the desktop viewer choose “iPhone” →
-“Показать QR-код”; scan it using that tab. Both devices must be on the same home
+The iPhone app is now a single fullscreen remote client. On the desktop viewer choose “iPhone” →
+“Показать QR-код”; scan it using the client. The old browser and screen-capture tabs are removed. Both devices must be on the same home
 LAN. The PC stays on. The app displays the same Android session and forwards touch,
 back and keyboard input; caption size and colors can be adjusted on the phone.
 
@@ -121,3 +121,21 @@ SDKs, weights, vendor downloads, emulator user data, signing keys and logs remai
 in ignored .validation-deps/ and .audit/. The emulator may contain account state
 entered by the owner. Never publish or erase it as a disposable build cache.
 This prototype is not packaged for installation on another PC.
+
+## Physical iPhone source candidate — not enabled
+
+The installed pymobiledevice3 11.46.0 includes CoreDevice DisplayService video
+streaming and UniversalHIDService touch/keyboard reports. Its implementation
+specifically documents the authentication settle interval for iPhone 11. These
+are candidates for a physical iPhone host, not a tested backend for this project.
+A second trusted device, a local developer-service tunnel, a mounted developer
+image and on-device verification are still required. No host tunnel or control
+service has been started as part of the 0.4 client update.
+
+The source phone would keep the original Pinduoduo in the foreground. A different
+iPhone would run our client; using one phone for both creates a screen feedback
+loop. The old capture UI must not be reintroduced into the client.
+
+Before enabling a physical backend, verify original goods navigation, live video
+cadence, continuous input, source-app boundaries, native text geometry and cleanup.
+Keep all device identifiers and pairing records out of public diagnostics.

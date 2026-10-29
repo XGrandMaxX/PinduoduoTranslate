@@ -35,6 +35,8 @@ iphone-unsigned-build:
     - python3 scripts/check_project.py
     - xcodegen generate
     - mkdir -p build
+    - swiftc App/RemoteGeometry.swift tests/RemoteGeometryChecks.swift -o build/geometry-tests
+    - build/geometry-tests
     - |
       if ! xcodebuild \
         -project PinduoTranslate.xcodeproj \
