@@ -10,8 +10,8 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     IPHONEOS_DEPLOYMENT_TARGET: '26.0'
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: '0.3.0'
-    CURRENT_PROJECT_VERSION: '3'
+    MARKETING_VERSION: '0.4.0'
+    CURRENT_PROJECT_VERSION: '4'
 configFiles:
   Debug: Config/Build.xcconfig
   Release: Config/Build.xcconfig
@@ -20,11 +20,7 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: '27.0'
-    sources:
-      - App
-      - Shared
-      - path: BrowserResources
-        buildPhase: resources
+    sources: [App]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).standalone27
@@ -32,50 +28,22 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         IPHONEOS_DEPLOYMENT_TARGET: '27.0'
     dependencies:
-      - sdk: AVKit.framework
-      - sdk: Translation.framework
-      - sdk: ReplayKit.framework
-      - sdk: ScreenCaptureKit.framework
-      - sdk: Vision.framework
-      - sdk: WebKit.framework
+      - sdk: AVFoundation.framework
+      - sdk: Security.framework
+      - sdk: CryptoKit.framework
   PinduoTranslate:
     type: application
     platform: iOS
-    sources:
-      - App
-      - Shared
-      - path: BrowserResources
-        buildPhase: resources
+    sources: [App]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX)
         INFOPLIST_FILE: Config/App-Info.plist
-        CODE_SIGN_ENTITLEMENTS: Config/App.entitlements
         GENERATE_INFOPLIST_FILE: NO
     dependencies:
-      - target: ScreenBroadcast
-        embed: true
-      - sdk: AVKit.framework
-      - sdk: Translation.framework
-      - sdk: ReplayKit.framework
-      - sdk: ScreenCaptureKit.framework
-      - sdk: Vision.framework
-      - sdk: WebKit.framework
-  ScreenBroadcast:
-    type: app-extension
-    platform: iOS
-    sources: [BroadcastExtension, Shared]
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).broadcast
-        INFOPLIST_FILE: Config/Broadcast-Info.plist
-        CODE_SIGN_ENTITLEMENTS: Config/Broadcast.entitlements
-        GENERATE_INFOPLIST_FILE: NO
-        APPLICATION_EXTENSION_API_ONLY: YES
-        SKIP_INSTALL: YES
-    dependencies:
-      - sdk: ReplayKit.framework
-      - sdk: Vision.framework
+      - sdk: AVFoundation.framework
+      - sdk: Security.framework
+      - sdk: CryptoKit.framework
 schemes:
   PinduoTranslate27:
     build:

@@ -1,4 +1,3 @@
 // Replace all three values with identifiers registered to your Apple team.
 DEVELOPMENT_TEAM = YOURTEAMID
 BUNDLE_PREFIX = com.yourname.pinduotranslate
-APP_GROUP_ID = group.com.yourname.pinduotranslate

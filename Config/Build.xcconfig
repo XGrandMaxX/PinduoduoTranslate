@@ -1,5 +1,4 @@
-// Copy Local.example.xcconfig to Local.xcconfig for your signing identifiers.
+// Optional signing identifiers stay in ignored Local.xcconfig.
 BUNDLE_PREFIX = com.example.pinduotranslate
-APP_GROUP_ID = group.com.example.pinduotranslate
 DEVELOPMENT_TEAM =
 #include? "Local.xcconfig"

@@ -10,8 +10,11 @@ struct RemotePair: Codable {
     let fingerprint: String
     let secret: String
     var valid: Bool {
-        version == 1 && (1...65535).contains(port) &&
-        host.range(of: "^[0-9.]+$", options: .regularExpression) != nil &&
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        let octets = parts.compactMap { Int($0) }
+        let local = parts.count == 4 && octets.count == 4 && parts.allSatisfy { !$0.isEmpty && $0.allSatisfy { $0.isNumber } } && octets.allSatisfy { (0...255).contains($0) } &&
+            (octets[0] == 10 || (octets[0] == 172 && (16...31).contains(octets[1])) || (octets[0] == 192 && octets[1] == 168))
+        return version == 1 && local && (1...65535).contains(port) &&
         fingerprint.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil && secret.count >= 40
     }
 }
@@ -29,12 +32,13 @@ final class RemoteSurface: UIView, UIKeyInput {
     private var captions: [[String: Any]] = []
     private var offset: CGFloat = 0
     private var pointers: [ObjectIdentifier: Int] = [:]
-    var videoRect: CGRect { AVMakeRect(aspectRatio: sourceSize, insideRect: bounds) }
+    var videoRect: CGRect { RemoteGeometry.fillRect(source: sourceSize, in: bounds) }
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .black
+        clipsToBounds = true
         isMultipleTouchEnabled = true
-        video.videoGravity = .resizeAspect
+        video.videoGravity = .resizeAspectFill
         layer.addSublayer(video)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:)") }
@@ -86,7 +90,7 @@ final class RemoteSurface: UIView, UIKeyInput {
                                  y: rect.minY + y * scale,
                                  width: box[2] * rect.width, height: box[3] * rect.height)
             label.font = .systemFont(ofSize: min(24 * fontScale, box[3] * sourceSize.height * 0.8) * scale)
-            var visible = label.frame.intersection(rect)
+            var visible = label.frame.intersection(bounds)
             if let scroll = item["scroll_box"] as? [Double], scroll.count == 4 {
                 let viewport = CGRect(x: rect.minX + scroll[0] * rect.width,
                                       y: rect.minY + scroll[1] * rect.height,
@@ -103,9 +107,8 @@ final class RemoteSurface: UIView, UIKeyInput {
         CATransaction.commit()
     }
     private func point(_ touch: UITouch) -> [String: Any] {
-        let p = touch.location(in: self), r = videoRect
-        return ["x": max(0, min(sourceSize.width - 1, (p.x-r.minX)/r.width*sourceSize.width)),
-                "y": max(0, min(sourceSize.height - 1, (p.y-r.minY)/r.height*sourceSize.height))]
+        let p = RemoteGeometry.sourcePoint(touch.location(in: self), source: sourceSize, bounds: bounds)
+        return ["x": p.x, "y": p.y]
     }
     private func inject(_ touch: UITouch, action: Int, pointer: Int) {
         var value = point(touch)
@@ -219,6 +222,10 @@ final class RemoteClient: NSObject, ObservableObject, URLSessionDelegate {
     private var socket: URLSessionWebSocketTask?
     private let decoder = RemoteH264()
     private let work = DispatchQueue(label: "pinduo.remote.video")
+    private var retry: DispatchWorkItem?
+    private var retryCount = 0
+    private var wantsConnection = true
+    var isPaired: Bool { pair != nil }
     override init() {
         super.init()
         decoder.surface = surface
@@ -233,7 +240,8 @@ final class RemoteClient: NSObject, ObservableObject, URLSessionDelegate {
     }
     func connect() {
         guard let pair else { status = "На ПК откройте «iPhone» и отсканируйте QR-код"; return }
-        disconnect()
+        wantsConnection = true
+        closeTransport()
         status = "Подключаюсь к ПК…"
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 12
@@ -246,10 +254,18 @@ final class RemoteClient: NSObject, ObservableObject, URLSessionDelegate {
         socket = task; task.resume(); receive(task)
     }
     func disconnect() {
+        wantsConnection = false
+        closeTransport()
+        status = "Подключение отключено"
+    }
+    private func closeTransport() {
+        retry?.cancel(); retry = nil
         surface.cancelInput()
         socket?.cancel(with: .normalClosure, reason: nil); socket = nil
         session?.invalidateAndCancel(); session = nil; connected = false
     }
+    func suspend() { closeTransport() }
+    func resume() { if wantsConnection && isPaired && !connected { connect() } }
     func send(_ value: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: value), let text = String(data: data, encoding: .utf8) else { return }
         socket?.send(.string(text)) { _ in }
@@ -264,6 +280,8 @@ final class RemoteClient: NSObject, ObservableObject, URLSessionDelegate {
                 case .string(let text):
                     if let data = text.data(using: .utf8), let value = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
                         DispatchQueue.main.async {
+                            guard self.socket === task else { return }
+                            self.retryCount = 0
                             self.connected = true; self.status = "ПК подключён"
                             self.surface.state(value)
                         }
@@ -272,7 +290,16 @@ final class RemoteClient: NSObject, ObservableObject, URLSessionDelegate {
                 }
                 self.receive(task)
             case .failure:
-                DispatchQueue.main.async { self.connected = false; self.status = "Связь с ПК прервалась. Проверьте сеть и нажмите «Подключить»." }
+                DispatchQueue.main.async {
+                    guard self.socket === task else { return }
+                    self.connected = false
+                    self.status = "Восстанавливаю связь с ПК…"
+                    guard self.wantsConnection else { return }
+                    self.retryCount += 1
+                    let item = DispatchWorkItem { [weak self] in self?.resume() }
+                    self.retry = item
+                    DispatchQueue.main.asyncAfter(deadline: .now() + min(8, pow(2, Double(min(self.retryCount,3)))*0.5), execute: item)
+                }
             }
         }
     }
@@ -286,7 +313,7 @@ final class RemoteClient: NSObject, ObservableObject, URLSessionDelegate {
         let data = SecCertificateCopyData(certificate) as Data
         let fingerprint = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         guard fingerprint == pair.fingerprint else {
-            DispatchQueue.main.async { self.status = "Сертификат ПК изменился. Отсканируйте новый QR-код." }
+            DispatchQueue.main.async { self.wantsConnection = false; self.status = "Сертификат ПК изменился. Отсканируйте новый QR-код." }
             completionHandler(.cancelAuthenticationChallenge, nil); return
         }
         completionHandler(.useCredential, URLCredential(trust: trust))
@@ -314,56 +341,119 @@ private struct RemoteSurfaceView: UIViewRepresentable {
 
 struct RemoteClientView: View {
     @StateObject private var client = RemoteClient()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var scanning = false
     @State private var settings = false
-    @State private var scale = 1.0
-    @State private var automatic = true
+    @State private var tools = false
+    @AppStorage("remote.fontScale") private var scale = 1.0
+    @AppStorage("remote.autoColors") private var automatic = true
     @State private var textColor = Color.black
     @State private var background = Color.white
+    private let accent = Color(red: 0.89, green: 0.16, blue: 0.13)
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 8) {
-                if client.connected {
-                    RemoteSurfaceView(client: client).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    HStack {
-                        Button("Назад") { client.send(["type":"key","code":4]) }
-                        Spacer()
-                        Button("Перевод") { client.surface.original.toggle(); client.surface.rebuildLabels(); client.send(["type":"translation","enabled":!client.surface.original]) }
-                        Spacer()
-                        Button { client.surface.becomeFirstResponder() } label: { Image(systemName:"keyboard") }
-                        Spacer()
-                        Button { settings = true } label: { Image(systemName:"textformat.size") }
-                    }.padding(.horizontal).padding(.bottom,8)
-                } else {
-                    Spacer()
-                    Image(systemName:"iphone.and.arrow.forward").font(.system(size:48)).foregroundStyle(.teal)
-                    Text(client.status).multilineTextAlignment(.center).padding()
-                    Button("Сканировать QR-код с ПК") { scanning = true }.buttonStyle(.borderedProminent)
-                    Button("Подключить") { client.connect() }.buttonStyle(.bordered)
-                    Text("На ПК: откройте переводчик → iPhone.\nОба устройства должны быть в одной домашней сети.")
-                        .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
-                    Spacer()
-                }
-            }
-            .navigationTitle("Пиндуо с ПК").navigationBarTitleDisplayMode(.inline)
-            .toolbar { if client.connected { Button("Отключить") { client.disconnect() } } }
-            .sheet(isPresented:$scanning) { RemoteQRScanner { value in scanning = false; client.pairAndConnect(value) } }
-            .sheet(isPresented:$settings) {
-                NavigationStack {
-                    Form {
-                        Section("Размер текста") { Slider(value:$scale,in:0.8...1.4) }
-                        Toggle("Цвет под экран",isOn:$automatic)
-                        if !automatic { ColorPicker("Текст",selection:$textColor); ColorPicker("Подложка",selection:$background) }
+        ZStack(alignment: .topTrailing) {
+            Color(.systemBackground).ignoresSafeArea()
+            if client.connected {
+                RemoteSurfaceView(client: client)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+                VStack(alignment: .trailing, spacing: 8) {
+                    Button { withAnimation(.easeInOut(duration: 0.15)) { tools.toggle() } } label: {
+                        Image(systemName: tools ? "xmark" : "ellipsis")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 42, height: 42)
                     }
-                    .navigationTitle("Перевод").toolbar { Button("Готово") { settings = false } }
-                    .onChange(of:scale) { _,value in client.surface.fontScale=value;client.surface.rebuildLabels() }
-                    .onChange(of:automatic) { _,value in client.surface.automaticColors=value;client.surface.rebuildLabels() }
-                    .onChange(of:textColor) { _,value in client.surface.textColor=UIColor(value);client.surface.rebuildLabels() }
-                    .onChange(of:background) { _,value in client.surface.backgroundColorForText=UIColor(value);client.surface.rebuildLabels() }
-                }
+                    .background(.regularMaterial, in: Circle())
+                    .accessibilityLabel("Управление")
+                    if tools {
+                        VStack(alignment: .leading, spacing: 0) {
+                            tool("Назад", "chevron.left") { client.send(["type":"key","code":4]); tools=false }
+                            tool("Ввести текст", "keyboard") { client.surface.becomeFirstResponder(); tools=false }
+                            tool("Оригинал / перевод", "character.bubble") {
+                                client.surface.original.toggle(); client.surface.rebuildLabels()
+                                client.send(["type":"translation","enabled":!client.surface.original]); tools=false
+                            }
+                            tool("Размер и цвет текста", "textformat.size") { client.surface.cancelInput(); settings=true; tools=false }
+                            Divider()
+                            tool("Отключиться", "power") { client.disconnect(); tools=false }
+                        }
+                        .padding(6).frame(width: 245)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                    }
+                }.padding(.trailing, 12).padding(.top, 8)
+            } else {
+                VStack(alignment: .leading, spacing: 24) {
+                    Spacer()
+                    Image(systemName: "character.bubble.fill")
+                        .font(.system(size: 42, weight: .medium)).foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Пиндуо").font(.system(size: 42, weight: .bold, design: .rounded))
+                        Text("Товары по-русски").font(.title3).foregroundStyle(.secondary)
+                    }
+                    Text(client.status).font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 12) {
+                        if client.isPaired {
+                            Button { client.connect() } label: {
+                                Label("Подключиться к ПК", systemImage: "arrow.right")
+                                    .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 10)
+                            }.buttonStyle(.borderedProminent)
+                        }
+                        Button { scanning=true } label: {
+                            Label(client.isPaired ? "Подключить другой ПК" : "Сканировать QR-код с ПК", systemImage: "qrcode.viewfinder")
+                                .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 10)
+                        }.buttonStyle(.bordered)
+                    }
+                    Text("Телефон и ПК должны быть в одной домашней сети. На ПК откройте переводчик и нажмите «iPhone».")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("0.4 · С ПК").font(.caption).foregroundStyle(.tertiary)
+                }.padding(28).frame(maxWidth: 480)
             }
-            .onDisappear { client.surface.cancelInput() }
         }
+        .tint(accent)
+        .statusBarHidden(client.connected)
+        .persistentSystemOverlays(client.connected ? .hidden : .automatic)
+        .ignoresSafeArea(.keyboard)
+        .sheet(isPresented: $scanning) {
+            ZStack(alignment: .topTrailing) {
+                RemoteQRScanner { value in scanning=false; client.pairAndConnect(value) }.ignoresSafeArea()
+                Button("Закрыть") { scanning=false }.buttonStyle(.borderedProminent).padding()
+            }
+        }
+        .sheet(isPresented: $settings) {
+            NavigationStack {
+                Form {
+                    Section("Размер текста") { Slider(value: $scale, in: 0.8...1.4) }
+                    Toggle("Подбирать цвет под экран", isOn: $automatic)
+                    if !automatic { ColorPicker("Текст", selection: $textColor); ColorPicker("Подложка", selection: $background) }
+                }
+                .navigationTitle("Оформление").navigationBarTitleDisplayMode(.inline)
+                .toolbar { Button("Готово") { settings=false } }
+                .onChange(of: scale) { _, _ in applyAppearance() }
+                .onChange(of: automatic) { _, _ in applyAppearance() }
+                .onChange(of: textColor) { _, _ in applyAppearance() }
+                .onChange(of: background) { _, _ in applyAppearance() }
+            }.presentationDetents([.medium, .large])
+        }
+        .onAppear { applyAppearance(); client.resume() }
+        .onDisappear { client.surface.cancelInput() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { client.resume() }
+            else if phase == .background { tools=false; client.suspend() }
+            else { client.surface.cancelInput() }
+        }
+    }
+    private func tool(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol).font(.subheadline)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+        }.buttonStyle(.plain)
+    }
+    private func applyAppearance() {
+        client.surface.fontScale=scale; client.surface.automaticColors=automatic
+        client.surface.textColor=UIColor(textColor); client.surface.backgroundColorForText=UIColor(background)
+        client.surface.rebuildLabels()
     }
 }
 

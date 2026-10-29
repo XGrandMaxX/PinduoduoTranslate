@@ -1,46 +1,32 @@
-"""Validate packaging invariants without Xcode or third-party dependencies."""
+"""Check the remote-only app's packaging and absence of retired capabilities."""
 from pathlib import Path
 import plistlib
 import sys
-
-ROOT = Path(__file__).resolve().parents[1]
-
-
+ROOT=Path(__file__).resolve().parents[1]
 def check():
-    plists = {}
-    for path in sorted((ROOT / 'Config').glob('*')):
-        if path.suffix in ('.plist', '.entitlements'):
-            with path.open('rb') as stream:
-                plists[path.name] = plistlib.load(stream)
-
-    app = plists['App-Info.plist']
-    extension = plists['Broadcast-Info.plist']
-    assert app['AppGroupIdentifier'] == extension['AppGroupIdentifier'] == '$(APP_GROUP_ID)'
-    for name in ('App.entitlements', 'Broadcast.entitlements'):
-        assert plists[name]['com.apple.security.application-groups'] == ['$(APP_GROUP_ID)']
-    assert extension['NSExtension']['NSExtensionPointIdentifier'] == 'com.apple.broadcast-services-upload'
-    assert extension['NSExtension']['NSExtensionPrincipalClass'] == '$(PRODUCT_MODULE_NAME).SampleHandler'
-    assert app['BroadcastExtensionIdentifier'] == '$(BUNDLE_PREFIX).broadcast'
-    assert 'screen-capture' in app['UIBackgroundModes']
-    assert app['NSScreenCaptureUsageDescription']
-    assert 'NSMicrophoneUsageDescription' not in app
-    standalone = plists['App27-Info.plist']
-    assert standalone['StorageMode'] == 'private'
-    assert 'AppGroupIdentifier' not in standalone
-    assert 'BroadcastExtensionIdentifier' not in standalone
-    for folder in ('App', 'BroadcastExtension', 'Shared'):
-        assert list((ROOT / folder).glob('*.swift')), f'No Swift sources in {folder}'
-    for resource in ('TranslatePage.js', 'Demo.html', 'DemoImage.svg'):
-        assert (ROOT / 'BrowserResources' / resource).is_file(), f'Missing browser resource: {resource}'
-    for path in ROOT.rglob('*.mobileprovision'):
-        raise AssertionError(f'Provisioning profile must stay outside project: {path.name}')
-    print(f'OK: {len(plists)} plist/entitlement files, shared identifiers, capture configuration and source targets')
-    print('This does not compile Swift or verify iPhone runtime behavior.')
-
-
-if __name__ == '__main__':
-    try:
-        check()
-    except (AssertionError, KeyError, ValueError, OSError) as error:
-        print(f'Configuration error: {error}', file=sys.stderr)
-        sys.exit(1)
+    expected={'PinduoTranslateApp.swift','RemoteClientView.swift','RemoteGeometry.swift'}
+    assert {p.name for p in (ROOT/'App').glob('*.swift')}==expected, 'Unexpected app source'
+    for folder in ('Shared','BroadcastExtension','BrowserResources'):
+        assert not (ROOT/folder).exists(), f'Retired feature directory: {folder}'
+    project=(ROOT/'project.yml').read_text(encoding='utf-8')
+    for token in ('ScreenBroadcast','BrowserResources','ReplayKit','ScreenCaptureKit','WebKit','App.entitlements'):
+        assert token not in project, f'Retired dependency: {token}'
+    for name in ('App-Info.plist','App27-Info.plist'):
+        value=plistlib.loads((ROOT/'Config'/name).read_bytes())
+        for key in ('UIBackgroundModes','NSScreenCaptureUsageDescription','AppGroupIdentifier','BroadcastExtensionIdentifier'):
+            assert key not in value, f'Retired capability: {name}/{key}'
+        assert value['NSLocalNetworkUsageDescription'] and value['NSCameraUsageDescription']
+        assert 'NSMicrophoneUsageDescription' not in value
+        assert value['UIRequiresFullScreen'] is True
+        assert value['NSAppTransportSecurity']=={'NSAllowsLocalNetworking':True}
+    entry=(ROOT/'App/PinduoTranslateApp.swift').read_text()
+    assert 'RemoteClientView()' in entry and 'TabView' not in entry
+    view=(ROOT/'App/RemoteClientView.swift').read_text()
+    assert '.resizeAspectFill' in view and 'RemoteGeometry.sourcePoint' in view
+    assert '.ignoresSafeArea()' in view
+    print('PASS: remote-only sources, fullscreen layout, local pairing permissions, no browser/capture capabilities')
+    print('Swift compilation and geometry checks run separately on the Mac build runner.')
+if __name__=='__main__':
+    try:check()
+    except (AssertionError,KeyError,ValueError,OSError) as error:
+        print(f'Configuration error: {error}',file=sys.stderr);sys.exit(1)

@@ -29,21 +29,12 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-		<string>screen-capture</string>
-	</array>
-	<key>NSScreenCaptureUsageDescription</key>
-	<string>Распознавать китайские надписи на выбранном экране и показывать перевод на русский.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>StorageMode</key>
-	<string>private</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Подключаться к вашему ПК в домашней сети, показывать Pinduoduo с переводом и передавать касания.</string>
 	<key>NSCameraUsageDescription</key>
@@ -53,5 +44,7 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 </dict>
 </plist>

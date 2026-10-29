@@ -4,11 +4,8 @@ on:
   push:
     paths:
       - 'App/**'
-      - 'BrowserResources/**'
       - 'tests/**'
       - 'scripts/**'
-      - 'BroadcastExtension/**'
-      - 'Shared/**'
       - 'Config/**'
       - 'project.yml'
       - '.github/workflows/ios-build.yml'
@@ -18,17 +15,17 @@ concurrency:
   group: iphone-build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  browser-tests:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: '22'
-      - run: npm install --prefix build/test-deps --no-audit --no-fund --ignore-scripts jsdom@26.1.0
-      - run: NODE_PATH=build/test-deps/node_modules node --test tests/browser_translation.test.cjs
+          python-version: '3.13'
+      - run: python scripts/check_project.py
+      - run: python scripts/check_secrets.py
   unsigned-build:
-    needs: browser-tests
+    needs: validate
     runs-on: xcode-27
     strategy:
       fail-fast: false
@@ -46,6 +43,11 @@ jobs:
         run: |
           python3 scripts/check_project.py
           python3 scripts/check_secrets.py
+      - name: Check fullscreen geometry and touch mapping
+        run: |
+          mkdir -p build
+          swiftc App/RemoteGeometry.swift tests/RemoteGeometryChecks.swift -o build/geometry-tests
+          build/geometry-tests
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build for a physical iPhone without signing
