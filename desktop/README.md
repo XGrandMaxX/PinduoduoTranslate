@@ -1,6 +1,72 @@
 # Local Pinduoduo translation prototype
 
-This is a local PC prototype. LAN playback and touch are verified; the full goods-detail flow remains unresolved.
+Local PC translator with two separate sources. The active setup now uses the
+owner's original iPhone Pinduoduo over USB, rather than the Android catalog.
+
+## Original iPhone → translated PC viewer
+
+Connect one trusted, unlocked iPhone over USB and leave its ordinary Pinduoduo
+open. Run `desktop/Start-Pinduo.ps1 -Source iphone`, then open
+http://127.0.0.1:18889/ on the PC. Click or drag on the displayed phone image;
+mouse-wheel gestures scroll the original app. The native back arrow is also
+available through the viewer's Back button. Text entry uses the iPhone's native
+HID keyboard: ASCII is supported; use the phone keyboard for other scripts.
+"Язык ввода" sends Control-Space to switch the iPhone keyboard layout. PageUp
+and PageDown also scroll the source. Continuous touch timestamps use the actual
+iPhone Mach clock and timebase, not Windows nanoseconds.
+
+This arrangement shows Russian captions **on the PC**. The source iPhone keeps
+Pinduoduo in front. The same phone cannot also run the translated remote client:
+that would capture the client itself. A second phone is optional only when a
+separate handheld remote viewer is wanted. The LAN phone relay is disabled while
+the physical iPhone is the source. No new iPhone app installation is needed.
+
+The independent USB-only developer tunnel listens on loopback port 18897.
+`Start-IPhoneTunnel.ps1` needs administrator rights; `prepare_iphone.py` mounts
+Apple developer support when needed and writes a private local media route.
+`Allow-IPhoneVideo.ps1` permits UDP 18899 only from that USB peer, on that tunnel
+interface, to the prepared Python executable. Reconnection can require renewing
+this narrow rule. No network profile or global firewall setting is changed.
+
+CoreDevice HEVC is decoded and transcoded to low-latency H264 for the existing
+viewer. Audio and clipboard synchronization are never started. Capture has no
+recording output. Stream recovery uses a private stable client identity. On
+idle pages the latest H264 GOP bootstraps a new viewer immediately. A read-only
+DVT still-frame fallback supplies the current image if no decodable video AU is
+available; it has a lower frame rate. RCTL receipts and bounded keyframe refresh
+keep native video recovering after packet loss. On
+cleanup, a global CoreDevice stop is used only if every advertised media session
+belongs to this identity; unrelated clients are left alone.
+
+On iOS 27 the accessibility-audit focus stream did not provide a usable native
+tree for Pinduoduo. The iPhone path therefore uses **local visual selection**:
+known shopping buttons and short, plain product-label panels below photographic
+areas. It excludes prices, sales/promotional rows and busy photo regions. This
+heuristic can miss a title or occasionally misclassify a plain label; it is not
+the Android native-ID selector. Wrapped captions retain their separate line
+rectangles so the shipping badge stays clear. Hover shows the full translation.
+The foreground Pinduoduo bundle is checked before and after OCR; other foreground
+apps do not feed text into the translation model. Captions clear on navigation,
+while scroll captions follow video motion. Animated product photos do not move
+captions when the user is not scrolling.
+Moving labels are also checked against their original text pixels: if motion
+cannot be tracked, the label is hidden until a fresh position is available
+instead of leaving an unrelated translation on a photograph.
+
+Chinese and English product titles use the local multilingual Tencent model.
+The launcher prefers HY-MT1.5-7B-Q4_K_M.gguf when installed, with the smaller model
+as a fallback. Official weights: https://huggingface.co/tencent/HY-MT1.5-7B-GGUF
+(7B Q4 SHA-256 fc87637e4dd29547811a28170770c2ac17725fb7690b7c4aafa4f463c3e77568).
+Shopping buttons use fixed Russian labels. Translation remains imperfect;
+verify the original description, options and quantities before ordering.
+
+Two native iPhone product cards opened successfully through PC-generated taps.
+Searching for "bag" returned product results; keyboard layout switching and
+continuous PageDown scrolling were verified on the source iPhone.
+Live cadence varied during testing; a stable 60 fps is not claimed. The synthetic
+tests cover H264 decoding, label selection, caption geometry and foreground-app
+isolation. Device/pairing identities, screenshots, tokens, logs and model files
+remain outside the public repository.
 
 ## WinClose boundary
 
@@ -14,7 +80,7 @@ reads its credentials, or exposes WinClose sender endpoints. The independent
 phone_link.py owns separate LAN pairing. Do not restore the former integration. See AGENTS.md.
 Any future iPhone connection must have independent pairing and transport.
 
-## Local PC use
+## Legacy Android PC source
 
 Run desktop/Start-Pinduo.ps1, then open http://127.0.0.1:18889/ on the PC.
 The launcher starts only the portable Android environment, local translation
@@ -123,23 +189,7 @@ in ignored .validation-deps/ and .audit/. The emulator may contain account state
 entered by the owner. Never publish or erase it as a disposable build cache.
 This prototype is not packaged for installation on another PC.
 
-## Physical iPhone source candidate — not enabled
-
-The installed pymobiledevice3 11.46.0 includes CoreDevice DisplayService video
-streaming and UniversalHIDService touch/keyboard reports. Its implementation
-specifically documents the authentication settle interval for iPhone 11. These
-are candidates for a physical iPhone host, not a tested backend for this project.
-A second trusted device, a local developer-service tunnel, a mounted developer
-image and on-device verification are still required. No host tunnel or control
-service has been started as part of the 0.4 client update.
-
-The source phone would keep the original Pinduoduo in the foreground. A different
-iPhone would run our client; using one phone for both creates a screen feedback
-loop. The old capture UI must not be reintroduced into the client.
-
-Before enabling a physical backend, verify original goods navigation, live video
-cadence, continuous input, source-app boundaries, native text geometry and cleanup.
-Keep all device identifiers and pairing records out of public diagnostics.
+## Legacy Android search failure
 
 The search error “系统繁忙 / 请稍后再试” means the source Pinduoduo reports
 “system busy / try again later”. The exact notice and Refresh/Retry actions are

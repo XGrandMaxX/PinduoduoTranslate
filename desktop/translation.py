@@ -48,6 +48,24 @@ def valid_translation(source, target):
     return [v.replace(',', '.') for v in NUMBER.findall(source)] == [v.replace(',', '.') for v in NUMBER.findall(target)]
 
 
+def caption_lines(text,boxes):
+    """Distribute whole translated words across original wrapped label boxes."""
+    words=text.split()
+    result=[]
+    for i,box in enumerate(boxes):
+        if not words:break
+        if i==len(boxes)-1:
+            count=len(words)
+        else:
+            fraction=(box[2]-box[0])/sum(b[2]-b[0] for b in boxes[i:])
+            desired=max(1,len(' '.join(words))*fraction)
+            count=1
+            while count<len(words) and len(' '.join(words[:count+1]))<=desired:
+                count+=1
+        result.append((' '.join(words[:count]),box));words=words[count:]
+    return result
+
+
 class Translator:
     def __init__(self, mirror, feed=None):
         from layout import LayoutFeed
@@ -71,6 +89,7 @@ class Translator:
         self.last_layout_error = ''
         self.window_id = None
         self.page_notice = None
+        self.anchor_navigation=0
 
     async def start(self):
         self.tasks = [asyncio.create_task(self._recognize()), asyncio.create_task(self._translate()),
@@ -155,6 +174,7 @@ class Translator:
                 if key == previous and self.anchors:
                     if mirror.latest_image is not None:
                         for anchor in self.anchors:
+                            anchor['scroll_ref']=getattr(mirror,'scroll_offset',0)
                             if not fits_image(mirror.latest_image,anchor['pixels']):continue
                             if 'signature' not in anchor or not unchanged(mirror.latest_image,anchor):
                                 anchor['signature']=signature(mirror.latest_image,anchor['pixels'])
@@ -179,6 +199,7 @@ class Translator:
                     else:
                         anchor['background']='#ffffff'
                 self.anchors = targets
+                self.anchor_navigation=getattr(mirror,'navigation_generation',0)
                 regions=[a['scroll_box'] for a in targets if a.get('scroll_box')]
                 if regions and hasattr(mirror,'motion_tracker'):mirror.motion_tracker.region=regions[0]
                 self.anchor_generation = generation
@@ -198,6 +219,10 @@ class Translator:
         english=[source for source in sources if not CHINESE.search(source)]
         chinese=[source for source in sources if CHINESE.search(source)]
         translated={}
+        if getattr(self.mirror,'source_kind',None)=='iphone':
+            # The multilingual model handles both Chinese and English. The
+            # legacy small English model mistranslated product terminology.
+            return {s:t for s in sources if valid_translation(s,t:=self._request_direct(s))}
         if english:
             if self.english_mt is None:
                 from english_mt import EnglishMT
@@ -207,11 +232,26 @@ class Translator:
         translated.update(self._request_chinese(chinese))
         return translated
 
+    def _request_direct(self,source):
+        # Use the model's documented single-segment prompt. Extra "preserve
+        # brands" instructions caused short product titles to be copied whole
+        # as brand names instead of translated.
+        instruction=('将以下文本翻译为俄语，注意只需要输出翻译后的结果，不要额外解释：'
+                     if CHINESE.search(source) else
+                     'Translate the following segment into Russian, without additional explanation.')
+        payload={'messages':[{'role':'user','content':instruction+'\n\n'+source}],
+                 'temperature':.2,'top_k':20,'top_p':.6,'repeat_penalty':1.05,'max_tokens':256}
+        key=(ROOT/'.audit/translation-local.key').read_text().strip()
+        request=urllib.request.Request('http://127.0.0.1:18891/v1/chat/completions',
+            data=json.dumps(payload).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+key})
+        with urllib.request.urlopen(request,timeout=12) as response:
+            return json.load(response)['choices'][0]['message']['content'].strip()
+
     def _request_chinese(self, sources):
         numbered = '\n'.join(f'{i+1}. {source}' for i, source in enumerate(sources))
         prompt = ('将以下文本翻译为俄语，注意只需要输出翻译后的结果，不要额外解释。保留每行编号、品牌、型号和数字：\n\n' + numbered)
         payload = {'messages': [{'role': 'user', 'content': prompt}], 'temperature': .2,
-                   'top_k': 20, 'top_p': .6, 'repeat_penalty': 1.05, 'max_tokens': 240}
+                   'top_k': 20, 'top_p': .6, 'repeat_penalty': 1.05, 'max_tokens': 512}
         key = (ROOT / '.audit/translation-local.key').read_text().strip()
         request = urllib.request.Request('http://127.0.0.1:18891/v1/chat/completions',
             data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json',
@@ -237,7 +277,7 @@ class Translator:
             now=time.monotonic()
             sources = list(dict.fromkeys(a['source'] for a in self.anchors
                 if a['role']=='title' and a['source'] not in self.cache and
-                self.retry_after.get(a['source'],0)<now))[:4]
+                self.retry_after.get(a['source'],0)<now))[:2 if getattr(self.mirror,'source_kind',None)=='iphone' else 4]
             if not sources:continue
             started = time.monotonic()
             try:
@@ -265,20 +305,31 @@ class Translator:
             await asyncio.sleep(.1)
             mirror = self.mirror
             captions = []
-            if self.enabled and self.ready and time.monotonic()-self.last_layout_at<4:
+            if (self.enabled and self.ready and time.monotonic()-self.last_layout_at<4 and
+                self.anchor_navigation==getattr(mirror,'navigation_generation',0)):
                 for anchor in self.anchors:
                     target=anchor['translation'] if anchor['role'] in ('button','notice') else self.cache.get(anchor['source'])
                     if not target:continue
+                    if anchor.get('scroll_box') and 'signature' in anchor and mirror.latest_image is not None:
+                        x,y,w,h=anchor['pixels']
+                        shifted={**anchor,'pixels':(x,round(y+mirror.scroll_offset-anchor.get('scroll_ref',0)),w,h)}
+                        if not unchanged(mirror.latest_image,shifted):continue
                     if (not anchor.get('scroll_box') and 'signature' in anchor and mirror.latest_image is not None and
                         not unchanged(mirror.latest_image,anchor)):
                         continue
                     # iPhone 0.3 already renders title rectangles. Keep that
                     # wire role for fixed status text; never make it clickable.
-                    captions.append({'text':target,'box':anchor['box'],'role':'title' if anchor['role']=='notice' else anchor['role'],
+                    item={'text':target,'box':anchor['box'],'role':'title' if anchor['role']=='notice' else anchor['role'],
                                      'kind':anchor['role'],
                                      'lines':anchor['lines'],'background':anchor.get('background','#ffffff'),
                                      'scroll_ref':anchor.get('scroll_ref',0),
-                                     'scroll_box':[v/(mirror.width if i%2==0 else mirror.height) for i,v in enumerate(anchor['scroll_box'])] if anchor.get('scroll_box') else None})
+                                     'scroll_box':[v/(mirror.width if i%2==0 else mirror.height) for i,v in enumerate(anchor['scroll_box'])] if anchor.get('scroll_box') else None}
+                    if anchor.get('line_boxes'):
+                        for line,box in caption_lines(target,anchor['line_boxes']):
+                            x,y,right,bottom=box
+                            captions.append({**item,'text':line,'full_text':target,'lines':1,
+                                'box':[x/mirror.width,y/mirror.height,(right-x)/mirror.width,(bottom-y)/mirror.height]})
+                    else:captions.append(item)
             state = {'captions':captions,'translation_status':self.status,
                      'translation_ready':self.ready,'translation_enabled':self.enabled}
             if state != previous:

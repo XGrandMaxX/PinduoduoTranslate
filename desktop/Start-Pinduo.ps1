@@ -1,15 +1,26 @@
-param()
+param([ValidateSet('android','iphone')][string]$Source='')
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path $PSScriptRoot -Parent
 $deps=Join-Path $taskRoot '.validation-deps'
 $audit=Join-Path $taskRoot '.audit'
 [void][IO.Directory]::CreateDirectory($audit)
 $python=Join-Path $deps 'device-runtime\Scripts\python.exe'
+$modePath=Join-Path $audit 'source-mode.json'
+if(!$Source){
+    $Source='android'
+    if(Test-Path -LiteralPath $modePath){$Source=(Get-Content -LiteralPath $modePath -Raw | ConvertFrom-Json).source}
+}
+if($Source -notin @('android','iphone')){throw 'Unknown source'}
+[IO.File]::WriteAllText($modePath,('{"source":"'+$Source+'"}'))
 $adb=Join-Path $deps 'android\platform-tools\adb.exe'
 $emulator=Join-Path $deps 'android\emulator\emulator.exe'
 $engine=Join-Path $deps 'translation-engine\llama-server.exe'
 $model=Join-Path $deps 'models\HY-MT1.5-1.8B-Q4_K_M.gguf'
-foreach($required in @($python,$adb,$emulator,$engine,$model)) {
+$largerModel=Join-Path $deps 'models\HY-MT1.5-7B-Q4_K_M.gguf'
+if(Test-Path -LiteralPath $largerModel){$model=$largerModel}
+$requiredFiles=@($python,$engine,$model)
+if($Source -eq 'android'){$requiredFiles+=@($adb,$emulator)}
+foreach($required in $requiredFiles) {
     if(!(Test-Path -LiteralPath $required)){throw 'Portable runtime is missing; see desktop/README.md.'}
 }
 function Health([int]$port) {
@@ -32,6 +43,7 @@ function Require-OwnListener([int]$port,[string]$exe) {
 }
 Require-OwnListener 18889 $python
 Require-OwnListener 18891 $engine
+if($Source -eq 'android') {
 $avdName=''
 $deviceList=(& $adb devices 2>$null) -join "`n"
 if($deviceList -match '(?m)^emulator-5554\s+device\s*$') {
@@ -66,6 +78,27 @@ if($displaySize -notmatch 'Override size: 480x1040') {
 $displayDensity=(& $adb -s emulator-5554 shell wm density 2>$null) -join ' '
 if($displayDensity -notmatch 'Override density: 213') {
     & $adb -s emulator-5554 shell wm density 213 | Out-Null
+}
+} else {
+    $tunnelListener=Get-NetTCPConnection -LocalPort 18897 -State Listen -ErrorAction SilentlyContinue
+    if(!$tunnelListener){
+        Write-Output 'Starting the dedicated iPhone USB tunnel (Windows administrator prompt)...'
+        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"'+(Join-Path $PSScriptRoot 'Start-IPhoneTunnel.ps1')+'"'))
+    }
+    & $python (Join-Path $PSScriptRoot 'prepare_iphone.py')
+    if($LASTEXITCODE -ne 0){throw 'iPhone developer connection failed.'}
+    $route=Get-Content -LiteralPath (Join-Path $audit 'iphone-media-route.json') -Raw | ConvertFrom-Json
+    $rule=Get-NetFirewallRule -Name 'Pinduo-iPhone-Video' -ErrorAction SilentlyContinue
+    $addresses=if($rule){$rule | Get-NetFirewallAddressFilter}else{$null}
+    $routeAllowed=$rule -and $rule.Enabled -eq 'True' -and $addresses.LocalAddress -contains $route.local -and $addresses.RemoteAddress -contains $route.remote
+    if(!$routeAllowed){
+        Write-Output 'Allowing video from this USB peer only (Windows administrator prompt)...'
+        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"'+(Join-Path $PSScriptRoot 'Allow-IPhoneVideo.ps1')+'"'))
+    }
+    try {
+        $tunnels=Invoke-RestMethod -Uri 'http://127.0.0.1:18897/' -TimeoutSec 2
+        if(!$tunnels.PSObject.Properties.Count){throw 'No USB device'}
+    } catch {throw 'Start desktop/Start-IPhoneTunnel.ps1 elevated, then prepare the paired iPhone USB video route.'}
 }
 if(!(Health 18891)) {
     Write-Output 'Starting local Russian translation...'

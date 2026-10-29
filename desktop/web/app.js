@@ -4,6 +4,7 @@ const stage = $('stage');
 let socket, decoder, configuration, needsKey = true, original = false;
 let width = 720, height = 1560, lastCaptions = [], rendered = 0;
 let translationStatus = 'Подключаю переводчик';
+let sourceIsIOS=false;
 let pendingFrame=null,paintScheduled=false,hasPicture=false;
 let scrollOffset=0,captionLabels=[],motionScheduled=false;
 const pointers = new Map();
@@ -72,7 +73,8 @@ function captions(items) {
     if(!['title','button'].includes(item.role))continue;
     const [x,y,w,h]=item.box;
     const label=document.createElement('span');label.className='caption';label.textContent=item.text;
-    const size=Math.min(Number($('fontSize').value),h*height*.76)*scale;
+    const size=Math.min(Number($('fontSize').value),h*height*.76,
+      h*height/(Math.max(1,item.lines||1)*1.14))*scale;
     const lines=Math.max(1,Math.min(item.lines||1,Math.floor(h*height*scale/(size*1.12))));
     Object.assign(label.style,{left:`${x*100}%`,top:`${y*100}%`,width:`${w*100}%`,height:`${h*100}%`,fontSize:`${size}px`});
     label.style.setProperty('--caption-lines',String(lines));
@@ -115,6 +117,14 @@ function connect() {
       return;
     }
     const state = JSON.parse(event.data);
+    if(state.source==='iphone'){
+      sourceIsIOS=true;
+      $('phoneButton').hidden=true;$('home').hidden=true;
+      $('keyboardLanguage').hidden=false;
+      $('text').placeholder='English (русский ввод — на iPhone)';
+      $('waiting').textContent='Подключаю экран iPhone…';
+    }
+    if(state.input_error)$('status').textContent=state.input_error;
     if (state.width) { width=state.width; height=state.height; stage.style.aspectRatio=`${width}/${height}`; }
     if(state.scroll_offset!==undefined)setMotion(state.scroll_offset);
     if(state.motion)setMotion(state.motion.offset);
@@ -170,6 +180,10 @@ stage.addEventListener('lostpointercapture',event=>{
   pendingMoves.delete(id);send({type:'touch',action:3,pointer:id,x:0,y:0});pointers.delete(event.pointerId);
 });
 stage.addEventListener('keydown',event=>{
+  if(['PageDown','PageUp'].includes(event.key)){
+    event.preventDefault();send({type:'scroll',x:width*.5,y:height*.7,amount:event.key==='PageDown'?-2:2});return;
+  }
+  if(sourceIsIOS&&event.ctrlKey&&event.code==='Space'){event.preventDefault();send({type:'key',code:204});return;}
   if(event.ctrlKey||event.metaKey||event.altKey)return;
   const code={Enter:66,Backspace:67,Delete:112,Escape:4,Tab:61,ArrowUp:19,ArrowDown:20,ArrowLeft:21,ArrowRight:22}[event.key];
   if(code){event.preventDefault();send({type:'key',code});}
@@ -180,6 +194,7 @@ stage.addEventListener('paste',event=>{
   if(text){event.preventDefault();send({type:'text',text:text.slice(0,1000)});}
 });
 $('back').onclick=()=>send({type:'key',code:4});$('home').onclick=()=>send({type:'key',code:3});
+$('keyboardLanguage').onclick=()=>send({type:'key',code:204});
 $('launch').onclick=()=>fetch('/open-pinduoduo',{method:'POST'});
 $('original').onclick=()=>{original=!original;$('original').textContent=original?'Перевод':'Оригинал';send({type:'translation',enabled:!original});captions(lastCaptions);};
 $('text').addEventListener('input',event=>{if(event.inputType==='deleteContentBackward')send({type:'key',code:67});else if(event.data)send({type:'text',text:event.data});$('text').value='';});
@@ -197,7 +212,7 @@ window.pinduoDiagnostics=()=>({renderedFrames:rendered,width,height,decoderState
 let wheelDelta=0,wheelPoint=null,wheelTimer=null;
 stage.addEventListener('wheel',event=>{
   event.preventDefault();wheelDelta+=Math.max(-240,Math.min(240,event.deltaY));wheelPoint=coordinates(event);
-  if(!wheelTimer)wheelTimer=setTimeout(()=>{send({type:'scroll',amount:-Math.max(-4,Math.min(4,wheelDelta/120)),...wheelPoint});wheelDelta=0;wheelTimer=null;},35);
+  if(!wheelTimer)wheelTimer=setTimeout(()=>{send({type:'scroll',amount:-Math.max(-4,Math.min(4,wheelDelta/120)),...wheelPoint});wheelDelta=0;wheelTimer=null;},sourceIsIOS?150:35);
 },{passive:false});
 stage.addEventListener('pointermove',event=>{
   if(pointers.size){stage.title='';return;}
@@ -206,7 +221,7 @@ stage.addEventListener('pointermove',event=>{
     const dy=item.scroll_box?(scrollOffset-(item.scroll_ref||0))/height:0;
     return nx>=item.box[0]&&nx<=item.box[0]+item.box[2]&&ny>=item.box[1]+dy&&ny<=item.box[1]+item.box[3]+dy;
   });
-  stage.title=item?.text||'';
+  stage.title=item?.full_text||item?.text||'';
 });
 
 let statsFrames=0,statsAt=performance.now();

@@ -23,6 +23,7 @@ BUTTONS={
     'buy':'Купить','order':'Заказать','place an order':'Заказать','add to bag':'В корзину',
     'select':'Выбрать','choose':'Выбрать','done':'Готово','apply':'Применить',
     'select options':'Выбрать вариант','size':'Размер','color':'Цвет','quantity':'Количество',
+    'overview':'Обзор','reviews':'Отзывы','details':'Описание','top':'Наверх',
     'agree':'Согласен','disagree':'Не согласен','view all':'Показать всё','see all':'Показать всё',
 }
 NO_TITLE=re.compile(r'验证码|密码|银行卡|收货地址|\b(?:password|verification|address)\b',re.I)
@@ -106,8 +107,9 @@ def select_targets(snapshot,width,height):
                          'pixels':(int(x),int(y),int(right-x),int(bottom-y)),
                          'box':[x/width,y/height,(right-x)/width,(bottom-y)/height],
                          'scroll_box':scroll_box,
+                         'line_boxes':node.get('line_boxes'),
                          'notice_code':NOTICE_CODES.get(text) if role=='notice' else None,
-                         'lines':1 if bottom-y<46 else 2})
+                         'lines':max(1,min(3,node.get('lines',1 if bottom-y<46 else 2)))})
     # Some widgets duplicate the same label in nested nodes.
     unique={}
     for item in selected:

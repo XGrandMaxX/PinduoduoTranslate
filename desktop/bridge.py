@@ -18,8 +18,19 @@ from controls import dispatch,release
 from phone_link import PhoneLink
 
 WEB = Path(__file__).parent / 'web'
-mirror = Mirror()
-translator = Translator(mirror)
+ROOT=Path(__file__).resolve().parents[1]
+mode_path=ROOT/'.audit/source-mode.json'
+mode=json.loads(mode_path.read_text()) if mode_path.exists() else {'source':'android'}
+if mode.get('source')=='iphone':
+    from ios_mirror import IOSMirror
+    from ios_layout import IOSLayoutFeed
+    mirror=IOSMirror()
+    translator=Translator(mirror,feed=IOSLayoutFeed(mirror))
+elif mode.get('source')=='android':
+    mirror=Mirror()
+    translator=Translator(mirror)
+else:
+    raise RuntimeError('Unknown screen source')
 phone=PhoneLink(mirror,translator)
 ALLOWED_HOSTS = {'127.0.0.1:18889', 'localhost:18889'}
 ALLOWED_ORIGINS = {f'http://{host}' for host in ALLOWED_HOSTS}
@@ -79,6 +90,8 @@ async def phone_state():return phone.state()
 
 @app.post('/phone/start')
 async def phone_start():
+    if getattr(mirror,'source_kind',None)=='iphone':
+        raise HTTPException(409,'iPhone сейчас является источником экрана. Управление доступно на ПК.')
     try:return await phone.start()
     except RuntimeError as error:raise HTTPException(409,str(error)) from None
 
@@ -97,8 +110,12 @@ async def phone_qr():
 
 @app.post('/open-pinduoduo')
 async def open_pinduoduo():
-    await mirror.adb('shell', 'am', 'start', '-n',
-                     'com.xunmeng.pinduoduo/com.xunmeng.pinduoduo.ui.activity.MainFrameActivity')
+    if getattr(mirror,'source_kind',None)=='iphone':
+        try:await mirror.open_pinduoduo()
+        except Exception:raise HTTPException(409,'Не удалось открыть Pinduoduo на iPhone') from None
+    else:
+        await mirror.adb('shell', 'am', 'start', '-n',
+                         'com.xunmeng.pinduoduo/com.xunmeng.pinduoduo.ui.activity.MainFrameActivity')
     return {'opened': True}
 
 
@@ -110,6 +127,8 @@ async def stream(ws: WebSocket):
     await ws.accept()
     owner=secrets.token_hex(12)
     queue = await mirror.subscribe()
+    queue.put_nowait({'translation_status':translator.status,'translation_ready':translator.ready,
+                      'translation_enabled':translator.enabled})
 
     async def send():
         while True:

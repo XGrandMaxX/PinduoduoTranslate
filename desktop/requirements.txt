@@ -9,3 +9,5 @@ opencv-python-headless==5.0.0.93
 cryptography==50.0.2
 qrcode[pil]==8.2
 websockets==15.0.1
+pymobiledevice3==11.46.0
+rapidocr==3.10.0
