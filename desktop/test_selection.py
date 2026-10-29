@@ -65,6 +65,15 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(items[0]['pixels'],(100,209,280,28))
         self.assertEqual(items[0]['scroll_box'],[0,0,480,1009])
 
+    def test_busy_notice_and_refresh_button_are_selected_without_image_ocr(self):
+        nodes=[node('系统繁忙',[190,600,290,630]),
+               node('请稍后再试',[180,640,300,665]),
+               node('Refresh',[150,700,330,750],cls='android.widget.Button',clickable=True),
+               node('系统繁忙',[0,100,300,400],cls='android.widget.ImageView')]
+        items=select_targets({'nodes':nodes},480,1040)
+        self.assertEqual([i['translation'] for i in items],['Занято','Позже','Обновить'])
+        self.assertEqual([i['notice_code'] for i in items],['system_busy','retry_later',None])
+
     def test_slow_snapshot_decoder_does_not_create_an_unbounded_queue(self):
         mirror=Mirror();mirror.decode_config=b'synthetic-config'
         mirror._offer_decode(KEYFRAME,b'key')

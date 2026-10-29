@@ -55,7 +55,7 @@ they do not permanently stop translation. Switching translation OFF/ON on an
 unchanged page also restores its captions. Regression tests cover both cases.
 
 The prototype supports pointer input, mouse-wheel scrolling, text entry and adjustable
-caption size/color/background. Text entry disables translation. Editable/password text and non-Pinduoduo system applications are excluded by
+caption size/color/background. Typing preserves the selected translation toggle. Editable/password text and non-Pinduoduo system applications are excluded by
 the native layout provider. Only selected title text reaches a translation engine.
 
 Keep port 18889 on 127.0.0.1. It has Host/Origin checks, not phone authentication.
@@ -77,8 +77,9 @@ loopback. No public tunnel, account credential or third-party pairing is involve
 Turn the phone link off from the same dialog when no longer needed. Do not share
 the QR code. Its key, certificate and pair file live only in ignored .audit/phone-link/.
 
-The iOS 26/27 unsigned builds pass CI; 0.3 (3) was verified installed over USB on
-the owner's iPhone. On 2026-10-29 the owner confirmed real-device LAN playback
+The iOS 26/27 0.4 builds pass CI, including fullscreen geometry checks. Version
+0.4 (4) was verified installed over USB; the owner confirmed no legacy tabs or
+side letterboxing. The goods-detail and search failures remain unresolved. On 2026-10-29 the owner confirmed real-device LAN playback
 and scrolling. Stable 45–60 fps is still not verified.
 
 ## Verified components
@@ -139,3 +140,11 @@ loop. The old capture UI must not be reintroduced into the client.
 Before enabling a physical backend, verify original goods navigation, live video
 cadence, continuous input, source-app boundaries, native text geometry and cleanup.
 Keep all device identifiers and pairing records out of public diagnostics.
+
+The search error “系统繁忙 / 请稍后再试” means the source Pinduoduo reports
+“system busy / try again later”. The exact notice and Refresh/Retry actions are
+now translated; this does not repair the native app's failed search request.
+Network checks found no emulator HTTP proxy, DNS resolution failures, clock skew
+or overriding split default VPN route. This still does not establish a particular
+server-side rejection reason. Do not describe the cause as proven anti-emulator
+blocking without additional evidence.

@@ -15,7 +15,7 @@ from websockets.exceptions import InvalidStatus
 
 from motion import ScrollMotion
 from phone_link import PhoneLink
-from controls import release
+from controls import release,dispatch
 
 
 class MotionTests(unittest.TestCase):
@@ -56,6 +56,20 @@ class FakeMirror:
 
 
 class LinkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_typing_preserves_translation_choice(self):
+        class TextMirror(FakeMirror):
+            async def text(self,value):self.events.append(value)
+        class Translator:
+            enabled=True
+            async def set_enabled(self,value):self.enabled=value
+        mirror=TextMirror();translator=Translator()
+        await dispatch({'type':'text','text':'test search'},mirror,translator,'viewer')
+        self.assertTrue(translator.enabled)
+        translator.enabled=False
+        await dispatch({'type':'text','text':'another search'},mirror,translator,'viewer')
+        self.assertFalse(translator.enabled)
+        self.assertEqual(mirror.events,['test search','another search'])
+
     async def test_tls_pair_stream_touch_and_disconnect(self):
         mirror=FakeMirror()
         with tempfile.TemporaryDirectory() as directory:

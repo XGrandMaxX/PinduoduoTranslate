@@ -150,7 +150,8 @@ class Translator:
                 self.layout_seconds = self.feed.seconds
                 self.selected_titles = sum(a['role']=='title' for a in targets)
                 self.selected_buttons = sum(a['role']=='button' for a in targets)
-                self.page_notice = 'sold_out' if any(a['role']=='notice' for a in targets) else None
+                notices=[a.get('notice_code') for a in targets if a['role']=='notice']
+                self.page_notice=next((code for code in notices if code!='retry_later'),notices[0] if notices else None)
                 if key == previous and self.anchors:
                     if mirror.latest_image is not None:
                         for anchor in self.anchors:

@@ -19,7 +19,8 @@ async def dispatch(message,mirror,translator,owner):
         if mirror.active_pointers and mirror.input_owner!=owner:return
         if kind=='key' and isinstance(message.get('code'),int):await mirror.key(message['code'])
         elif kind=='text' and isinstance(message.get('text'),str):
-            await translator.set_enabled(False)
+            # Editable/password text is already excluded by the layout feed.
+            # Typing a search must not silently turn off all later translations.
             await mirror.text(message['text'][:1000])
         elif kind=='scroll':
             values=[message.get(k) for k in ('x','y','amount')]

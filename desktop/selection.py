@@ -17,6 +17,8 @@ BUTTONS={
     'pay now':'Оплатить','confirm payment':'Оплатить','continue':'Далее',
     'next':'Далее','back':'Назад','cancel':'Отмена','confirm':'Подтвердить',
     'search':'Поиск','home':'Главная','cart':'Корзина','you':'Профиль',
+    'refresh':'Обновить','retry':'Повторить','try again':'Повторить',
+    '刷新':'Обновить','重试':'Повторить','重新加载':'Обновить',
     'following':'Подписки','bundles':'Совместно','sale':'Акции',
     'buy':'Купить','order':'Заказать','place an order':'Заказать','add to bag':'В корзину',
     'select':'Выбрать','choose':'Выбрать','done':'Готово','apply':'Применить',
@@ -26,7 +28,10 @@ BUTTONS={
 NO_TITLE=re.compile(r'验证码|密码|银行卡|收货地址|\b(?:password|verification|address)\b',re.I)
 NOTICES={
     '商品已售罄，推荐以下相似商品':'Распродано. Похожие ниже',
+    '系统繁忙':'Занято',
+    '请稍后再试':'Позже',
 }
+NOTICE_CODES={'商品已售罄，推荐以下相似商品':'sold_out','系统繁忙':'system_busy','请稍后再试':'retry_later'}
 
 
 def select_targets(snapshot,width,height):
@@ -51,7 +56,7 @@ def select_targets(snapshot,width,height):
         if x<0 or y<0 or right>width or bottom>height or right-x<18 or bottom-y<14:continue
         name=node.get('id','').rsplit('/',1)[-1]
         native_title=name in TITLE_IDS and 'TextView' in node.get('class','')
-        if name=='tv_content' and text in NOTICES:
+        if text in NOTICES and any(kind in node.get('class','') for kind in ('TextView','Button')):
             role='notice';translation=NOTICES[text]
         elif native_title:
             if name=='tv_title' and not node.get('trusted_title'):
@@ -101,6 +106,7 @@ def select_targets(snapshot,width,height):
                          'pixels':(int(x),int(y),int(right-x),int(bottom-y)),
                          'box':[x/width,y/height,(right-x)/width,(bottom-y)/height],
                          'scroll_box':scroll_box,
+                         'notice_code':NOTICE_CODES.get(text) if role=='notice' else None,
                          'lines':1 if bottom-y<46 else 2})
     # Some widgets duplicate the same label in nested nodes.
     unique={}
