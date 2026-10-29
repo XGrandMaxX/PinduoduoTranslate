@@ -101,7 +101,7 @@ public final class LayoutInstrumentation extends Instrumentation {
         AccessibilityNodeInfo parent=node.getParent();
         for(int i=0;i<9 && parent!=null;i++) {
             String name=str(parent.getClassName());
-            if((name.contains("RecyclerView") || name.contains("ScrollView")) && !name.contains("Horizontal")) {
+            if((name.contains("RecyclerView") || name.contains("ScrollView") || name.contains("ProductListView")) && !name.contains("Horizontal")) {
                 Rect rect=new Rect();parent.getBoundsInScreen(rect);parent.recycle();return rect;
             }
             AccessibilityNodeInfo next=parent.getParent();parent.recycle();parent=next;

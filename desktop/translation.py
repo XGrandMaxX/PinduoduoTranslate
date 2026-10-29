@@ -70,6 +70,7 @@ class Translator:
         self.layout_failures = 0
         self.last_layout_error = ''
         self.window_id = None
+        self.page_notice = None
 
     async def start(self):
         self.tasks = [asyncio.create_task(self._recognize()), asyncio.create_task(self._translate()),
@@ -141,6 +142,7 @@ class Translator:
                 if window is not None:self.window_id=window
                 if snapshot.get('fast'):
                     targets.extend(a for a in self.anchors if a['role']=='button' and not a.get('scroll_box'))
+                    targets.extend(a for a in self.anchors if a['role']=='notice')
                     if not any(a['role']=='title' for a in targets):
                         targets.extend(a for a in self.anchors if a['role']=='title')
                 key = (getattr(mirror,'session_count',0),window,tuple((a['source'],a['pixels'],a['role']) for a in targets))
@@ -148,6 +150,7 @@ class Translator:
                 self.layout_seconds = self.feed.seconds
                 self.selected_titles = sum(a['role']=='title' for a in targets)
                 self.selected_buttons = sum(a['role']=='button' for a in targets)
+                self.page_notice = 'sold_out' if any(a['role']=='notice' for a in targets) else None
                 if key == previous and self.anchors:
                     if mirror.latest_image is not None:
                         for anchor in self.anchors:
@@ -263,12 +266,15 @@ class Translator:
             captions = []
             if self.enabled and self.ready and time.monotonic()-self.last_layout_at<4:
                 for anchor in self.anchors:
-                    target=anchor['translation'] if anchor['role']=='button' else self.cache.get(anchor['source'])
+                    target=anchor['translation'] if anchor['role'] in ('button','notice') else self.cache.get(anchor['source'])
                     if not target:continue
                     if (not anchor.get('scroll_box') and 'signature' in anchor and mirror.latest_image is not None and
                         not unchanged(mirror.latest_image,anchor)):
                         continue
-                    captions.append({'text':target,'box':anchor['box'],'role':anchor['role'],
+                    # iPhone 0.3 already renders title rectangles. Keep that
+                    # wire role for fixed status text; never make it clickable.
+                    captions.append({'text':target,'box':anchor['box'],'role':'title' if anchor['role']=='notice' else anchor['role'],
+                                     'kind':anchor['role'],
                                      'lines':anchor['lines'],'background':anchor.get('background','#ffffff'),
                                      'scroll_ref':anchor.get('scroll_ref',0),
                                      'scroll_box':[v/(mirror.width if i%2==0 else mirror.height) for i,v in enumerate(anchor['scroll_box'])] if anchor.get('scroll_box') else None})

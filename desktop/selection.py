@@ -24,6 +24,9 @@ BUTTONS={
     'agree':'Согласен','disagree':'Не согласен','view all':'Показать всё','see all':'Показать всё',
 }
 NO_TITLE=re.compile(r'验证码|密码|银行卡|收货地址|\b(?:password|verification|address)\b',re.I)
+NOTICES={
+    '商品已售罄，推荐以下相似商品':'Распродано. Похожие ниже',
+}
 
 
 def select_targets(snapshot,width,height):
@@ -48,7 +51,9 @@ def select_targets(snapshot,width,height):
         if x<0 or y<0 or right>width or bottom>height or right-x<18 or bottom-y<14:continue
         name=node.get('id','').rsplit('/',1)[-1]
         native_title=name in TITLE_IDS and 'TextView' in node.get('class','')
-        if native_title:
+        if name=='tv_content' and text in NOTICES:
+            role='notice';translation=NOTICES[text]
+        elif native_title:
             if name=='tv_title' and not node.get('trusted_title'):
                 # tv_title is also used by generic dialogs. Require a sizeable
                 # product image above this label in the same native container.
@@ -89,7 +94,7 @@ def select_targets(snapshot,width,height):
         for _ in range(10):
             if not isinstance(parent,int) or not 0<=parent<len(nodes):break
             cls=nodes[parent].get('class','')
-            if ('RecyclerView' in cls or 'ScrollView' in cls) and 'Horizontal' not in cls:
+            if any(kind in cls for kind in ('RecyclerView','ScrollView','ProductListView')) and 'Horizontal' not in cls:
                 scroll_box=nodes[parent].get('box');break
             parent=nodes[parent].get('parent',-1)
         selected.append({'source':text,'role':role,'translation':translation,

@@ -93,5 +93,23 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(translator.layout_failures,0)
         finally:await translator.close()
 
+    async def test_fixed_notice_reaches_existing_iphone_without_model_call(self):
+        mirror=MirrorFixture();feed=FeedFixture();translator=Translator(mirror,feed)
+        async def snapshot(fast=False):
+            return {'nodes':[{'id':'fixture/tv_content','text':'商品已售罄，推荐以下相似商品',
+                    'class':'android.widget.TextView','parent':-1,'box':[100,209,380,237]}]}
+        feed.snapshot=snapshot
+        def forbidden(sources):raise AssertionError('Fixed UI notice must not invoke a translation model')
+        translator._request=forbidden
+        await translator.start()
+        try:
+            await until(lambda:bool(mirror.captions))
+            self.assertEqual(mirror.captions[0]['text'],'Распродано. Похожие ниже')
+            self.assertEqual(mirror.captions[0]['role'],'title')
+            self.assertEqual(mirror.captions[0]['kind'],'notice')
+            self.assertEqual(translator.page_notice,'sold_out')
+            self.assertFalse(translator.cache)
+        finally:await translator.close()
+
 
 if __name__=='__main__':unittest.main()

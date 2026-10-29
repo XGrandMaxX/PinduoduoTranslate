@@ -69,7 +69,8 @@ async def health():
             'layout_seconds': translator.layout_seconds, 'translation_seconds': translator.translation_seconds,
             'selected_titles':translator.selected_titles,'selected_buttons':translator.selected_buttons,
             'layout_failures':translator.layout_failures,'layout_error':translator.last_layout_error,
-            'translation_status':translator.status,'viewer':mirror.viewer_stats,'phone':phone.state()}
+            'translation_status':translator.status,'page_notice':translator.page_notice,
+            'viewer':mirror.viewer_stats,'phone':phone.state()}
 
 
 @app.get('/phone')

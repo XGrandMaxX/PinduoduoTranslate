@@ -54,6 +54,17 @@ class SelectionTests(unittest.TestCase):
                node('Buy now',[0,200,300,500],cls='android.widget.ImageView',clickable=True)]
         self.assertEqual(select_targets({'nodes':nodes},720,1560),[])
 
+    def test_exact_sold_out_notice_is_translated_in_its_native_box(self):
+        nodes=[node('',[0,0,480,1009],cls='com.pdd.GoodsDetailSmartProductListView'),
+               node('商品已售罄，推荐以下相似商品',[100,209,380,237],'tv_content',parent=0),
+               node('Account private data',[10,40,300,80],'tv_content',parent=0)]
+        items=select_targets({'nodes':nodes},480,1040)
+        self.assertEqual(len(items),1)
+        self.assertEqual(items[0]['role'],'notice')
+        self.assertEqual(items[0]['translation'],'Распродано. Похожие ниже')
+        self.assertEqual(items[0]['pixels'],(100,209,280,28))
+        self.assertEqual(items[0]['scroll_box'],[0,0,480,1009])
+
     def test_slow_snapshot_decoder_does_not_create_an_unbounded_queue(self):
         mirror=Mirror();mirror.decode_config=b'synthetic-config'
         mirror._offer_decode(KEYFRAME,b'key')

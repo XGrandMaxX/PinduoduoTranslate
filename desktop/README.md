@@ -99,6 +99,14 @@ Run: python -m unittest discover -s desktop -p 'test_*.py' -q
 The owner confirmed on 2026-10-29 that translated titles reappeared and scrolling
 became smoother with this fast profile. This verifies the PC prototype only.
 
+On the same date, product taps were verified to navigate to the native goods
+activity, but three sampled products returned Pinduoduo's sold-out/recommendations
+page. Session renewal did not resolve the sampled failure; the owner reports that
+the original iPhone app opens goods. The cause of this discrepancy is unresolved.
+The exact sold-out notice is now translated in its original label rectangle,
+including on the existing iPhone 0.3 client. The notice is a server/app response,
+not independent confirmation that the product is actually unavailable.
+
 If rebuilding the helper APK is needed, run desktop/Build-Layout.ps1 with the
 already prepared Android SDK/JDK. The helper exists only in the dedicated emulator;
 it is not an iPhone application or a Windows application installation.
