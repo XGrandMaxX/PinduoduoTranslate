@@ -330,7 +330,10 @@ class Translator:
                             captions.append({**item,'text':line,'full_text':target,'lines':1,
                                 'box':[x/mirror.width,y/mirror.height,(right-x)/mirror.width,(bottom-y)/mirror.height]})
                     else:captions.append(item)
-            state = {'captions':captions,'translation_status':self.status,
+            status=self.status
+            if self.ready and getattr(mirror,'source_kind',None)=='iphone' and not mirror.foreground_pdd:
+                status='На iPhone откройте обычный Pinduoduo — кнопка вверху'
+            state = {'captions':captions,'translation_status':status,
                      'translation_ready':self.ready,'translation_enabled':self.enabled}
             if state != previous:
                 mirror.captions = captions

@@ -385,8 +385,12 @@ class IOSMirror(Mirror):
 
     async def open_pinduoduo(self):
         from pymobiledevice3.remote.core_device.app_service import AppServiceService
+        if self.foreground_pdd:
+            return
         async with AppServiceService(self.rsd) as apps:
-            await apps.launch_application('com.xunmeng.pinduoduo', kill_existing=False)
+            # Returning an existing background process does not activate it.
+            # Relaunch only when Pinduoduo is outside the foreground.
+            await apps.launch_application('com.xunmeng.pinduoduo', kill_existing=True)
 
     async def _stop_owned_media(self):
         from pymobiledevice3.remote.core_device.display_service import DisplayService

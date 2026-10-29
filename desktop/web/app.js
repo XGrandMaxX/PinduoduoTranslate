@@ -119,6 +119,8 @@ function connect() {
     const state = JSON.parse(event.data);
     if(state.source==='iphone'){
       sourceIsIOS=true;
+      document.querySelector('header strong').textContent='iPhone → ПК';
+      $('launch').textContent='Открыть Pinduoduo на iPhone';
       $('phoneButton').hidden=true;$('home').hidden=true;
       $('keyboardLanguage').hidden=false;
       $('text').placeholder='English (русский ввод — на iPhone)';
@@ -195,7 +197,13 @@ stage.addEventListener('paste',event=>{
 });
 $('back').onclick=()=>send({type:'key',code:4});$('home').onclick=()=>send({type:'key',code:3});
 $('keyboardLanguage').onclick=()=>send({type:'key',code:204});
-$('launch').onclick=()=>fetch('/open-pinduoduo',{method:'POST'});
+$('launch').onclick=async()=>{
+  $('status').textContent=sourceIsIOS?'Открываю обычный Pinduoduo на iPhone…':'Открываю Pinduoduo…';
+  try{
+    const response=await fetch('/open-pinduoduo',{method:'POST'});
+    if(!response.ok){const error=await response.json();throw new Error(error.detail||'Не удалось открыть Pinduoduo');}
+  }catch(error){$('status').textContent=error.message;}
+};
 $('original').onclick=()=>{original=!original;$('original').textContent=original?'Перевод':'Оригинал';send({type:'translation',enabled:!original});captions(lastCaptions);};
 $('text').addEventListener('input',event=>{if(event.inputType==='deleteContentBackward')send({type:'key',code:67});else if(event.data)send({type:'text',text:event.data});$('text').value='';});
 $('text').addEventListener('keydown',event=>{if(event.key==='Enter'){send({type:'key',code:66});$('text').blur();}});

@@ -40,6 +40,21 @@ async def until(predicate,timeout=3):
 
 
 class RecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_iphone_other_app_shows_original_pinduoduo_instruction(self):
+        from unittest.mock import AsyncMock
+        mirror=MirrorFixture();mirror.source_kind='iphone';mirror.foreground_pdd=False
+        mirror.broadcast=AsyncMock()
+        feed=FeedFixture()
+        async def snapshot(fast=False):return {'nodes':[],'window':'outside-pinduoduo'}
+        feed.snapshot=snapshot
+        translator=Translator(mirror,feed)
+        await translator.start()
+        try:
+            await until(lambda:any('обычный Pinduoduo' in call.args[0].get('translation_status','')
+                                   for call in mirror.broadcast.call_args_list))
+            self.assertEqual(mirror.captions,[])
+        finally:await translator.close()
+
     async def test_disconnect_does_not_kill_translation_worker(self):
         mirror=MirrorFixture();feed=FeedFixture(disconnect=True);translator=Translator(mirror,feed)
         translator._request=lambda sources:{s:'Тестовая сумка' for s in sources}

@@ -75,6 +75,22 @@ class IOSSourceTests(unittest.TestCase):
 
 
 class IOSPrivacyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_open_activates_background_pinduoduo_but_preserves_foreground_app(self):
+        mirror=IOSMirror()
+        app=Mock()
+        app.__aenter__=AsyncMock(return_value=app)
+        app.__aexit__=AsyncMock(return_value=False)
+        app.launch_application=AsyncMock()
+        try:
+            with patch('pymobiledevice3.remote.core_device.app_service.AppServiceService',return_value=app):
+                await mirror.open_pinduoduo()
+                app.launch_application.assert_awaited_once_with('com.xunmeng.pinduoduo',kill_existing=True)
+                app.launch_application.reset_mock()
+                mirror.foreground_pdd=True
+                await mirror.open_pinduoduo()
+                app.launch_application.assert_not_awaited()
+        finally:mirror.pool.shutdown(wait=True)
+
     async def test_static_video_bootstrap_does_not_wait_for_another_phone_frame(self):
         mirror=IOSMirror()
         mirror.config_packet=b'config'
