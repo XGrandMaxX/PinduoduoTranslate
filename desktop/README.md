@@ -106,6 +106,10 @@ the original iPhone app opens goods. The cause of this discrepancy is unresolved
 The exact sold-out notice is now translated in its original label rectangle,
 including on the existing iPhone 0.3 client. The notice is a server/app response,
 not independent confirmation that the product is actually unavailable.
+The app's own Country/Region & Language settings originally showed Kazakhstan
+and English. Testing Chinese Mainland, Chinese UI language and an app restart
+also reproduced the sold-out response. These settings were restored afterward;
+do not assume that changing the market fixes this problem.
 
 If rebuilding the helper APK is needed, run desktop/Build-Layout.ps1 with the
 already prepared Android SDK/JDK. The helper exists only in the dedicated emulator;
