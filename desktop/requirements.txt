@@ -9,4 +9,3 @@ opencv-python-headless==5.0.0.93
 cryptography==50.0.2
 qrcode[pil]==8.2
 websockets==15.0.1
-
